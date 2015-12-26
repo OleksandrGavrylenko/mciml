@@ -1,4 +1,4 @@
-#use "straightline.ml"
+open Straightline;;
 
 let listmax l = match l with
     [] -> invalid_arg "empty list"
