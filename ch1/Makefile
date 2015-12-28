@@ -8,6 +8,3 @@ maxarg:
 
 clean:
 	-rm -f eval maxarg *.cmi *.cmx *.o
-
-
-
