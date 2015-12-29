@@ -1,56 +1,64 @@
+{
+open Lexing
+open Tokens
+
+exception SyntaxError of string
+}
+
 let digit = ['0'-'9']
 let int_ = '-'? digit+
-let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
+let white = [' ' '\t']+
 let id = ['a' - 'z' 'A' - 'Z' '_'] ['a' - 'z' '0' - '9' '_']*
 
 rule read = parse
-    | white -> { read lexbuf }
-    | newline { next_line lexbuf; read lexbuf }
+    | white { read lexbuf }
+    | newline { read lexbuf }
     | '"' { read_string (Buffer.create 17) lexbuf }
+    | "/*" { read_comment lexbuf; read lexbuf }
+    | "type" { TYPE }
+    | "var" { VAR }
+    | "function" { FUNCTION }
+    | "break" { BREAK }
+    | "of" { OF }
+    | "end" { END }
+    | "in" { IN }
+    | "nil" { NIL }
+    | "let" { LET }
+    | "do" { DO }
+    | "to" { TO }
+    | "for" { FOR }
+    | "while" { WHILE }
+    | "else" { ELSE }
+    | "then" { THEN }
+    | "if" { IF }
+    | "array" { ARRAY }
+    | ":=" { ASSIGN }
+    | '|' { OR }
+    | '&' { AND }
+    | ">=" { GE }
+    | '>' { GT }
+    | "<=" { LE }
+    | '<' { LT }
+    | "<>" { NEQ }
+    | '=' { EQ }
+    | '/' { DIVIDE }
+    | '*' { TIMES }
+    | '-' { MINUS }
+    | '+' { PLUS }
+    | '.' { DOT }
+    | '{' { RBRACE }
+    | '}' { LBRACE }
+    | '[' { RBRACK }
+    | ']' { LBRACK }
+    | '(' { RPAREN }
+    | ')' { LPAREN }
+    | ';' { SEMICOLON }
+    | ':' { COLON }
+    | ',' { COMMA }
+    | eof { EOF }
     | int_ { INT (int_of_string (Lexing.lexeme lexbuf)) }
-    | ID of string
-    | "type" -> { TYPE }
-    | "var" -> { VAR }
-    | "function" -> { FUNCTION }
-    | "break" -> { BREAK }
-    | "of" -> { OF }
-    | "end" -> { END }
-    | "in" -> { IN }
-    | "nil" -> { NIL }
-    | "let" -> { LET }
-    | "do" -> { DO }
-    | "to" -> { TO }
-    | "for" -> { FOR }
-    | "while" -> { WHILE }
-    | "else" -> { ELSE }
-    | "then" -> { THEN }
-    | "if" -> { IF }
-    | "array" -> { ARRAY }
-    | ":=" -> { ASSIGN }
-    | '|' -> { OR }
-    | '&' -> { AND }
-    | ">=" -> { GE }
-    | '>' -> { GT }
-    | "<=" -> { LE }
-    | '<' -> { LT }
-    | "<>" -> { NEQ }
-    | '=' -> { EQ }
-    | '/' -> { DIVIDE }
-    | '*' -> { TIMES }
-    | '-' -> { MINUS }
-    | '+' -> { PLUS }
-    | '.' -> { DOT }
-    | '{' -> { RBRACE }
-    | '}' -> { LBRACE }
-    | '[' -> { RBRACK }
-    | ']' -> { LBRACK }
-    | '(' -> { RPAREN }
-    | ')' -> { LPAREN }
-    | ';' -> { SEMICOLON }
-    | ':' -> { COLON }
-    | ',' -> { COMMA }
-    | eof -> { EOF }
+    | id { ID (Lexing.lexeme lexbuf)}
 
 and read_string buf = parse
     | '"' { STRING (Buffer.contents buf) }
@@ -65,3 +73,25 @@ and read_string buf = parse
                       read_string buf lexbuf }
     | _ { raise (SyntaxError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
     | eof { raise (SyntaxError ("String is not terminated")) }
+
+and read_comment = parse
+    | '*' '/' { }
+    | eof { raise (SyntaxError ("Unterminated comment")) }
+    | _ {read_comment lexbuf}
+
+{
+
+let rec toks buf = match read buf with
+    | EOF -> [EOF]
+    | tok -> tok::toks buf
+
+
+let main () = 
+    let lexbuf = Lexing.from_channel stdin in
+    let res = toks lexbuf in
+    let _ = List.map (Format.printf "%a\n" pp_token) res in
+    ()
+
+let _ = main ()
+
+}
