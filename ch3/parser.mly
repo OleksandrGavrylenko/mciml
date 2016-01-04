@@ -12,7 +12,8 @@
 %token <string> ID
 %token EOF
 
-%right THEN ELSE DO
+%nonassoc THEN DO
+%nonassoc ELSE
 %nonassoc ASSIGN
 %left AND OR
 %nonassoc EQ NEQ LT LE GT GE
