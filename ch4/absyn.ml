@@ -1,9 +1,14 @@
+open Symbol
+
 type pos = Lexing.position
-type symbol = Symbol.Symbol.symbol  (* Insanity! *)
+
+let pp_pos fmt pos = ()
+(* skip pretty-printing of position for now *)
 
 type var = SimpleVar of symbol * pos
          | FieldVar of var * symbol * pos
          | SubscriptVar of var * exp * pos
+         [@@deriving show]
 
 and exp = VarExp of var
         | NilExp
@@ -20,26 +25,33 @@ and exp = VarExp of var
         | BreakExp of pos
         | LetExp of dec list * exp * pos
         | ArrayExp of symbol * exp * exp * pos
+        [@@deriving show]
 
 and dec = FunctionDec of fundec
         | VarDec of vardec
         | TypeDec of (symbol * ty * pos)
+        [@@deriving show]
 
 and ty = NameTy of symbol * pos
        | RecordTy of field list
        | ArrayTy of symbol * pos
+       [@@deriving show]
 
 and oper = PlusOp | MinusOp | TimesOp | DivideOp
          | EqOp | NeqOp | LtOp | LeOp | GtOp | GeOp
+         [@@deriving show]
 
 and field = {name: symbol; escape: bool ref; typ: symbol; pos: pos}
+            [@@deriving show]
 
 and fundec = {name: symbol; params: field list;
 		      result: (symbol * pos) option;
 		      body: exp; pos: pos}
+             [@@deriving show]
 
 and vardec = {name: symbol;
               escape: bool ref;
               typ: (symbol * pos) option;
               init: exp;
               pos: pos}
+             [@@deriving show]

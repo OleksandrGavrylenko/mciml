@@ -1,6 +1,8 @@
 /* A program to solve the 8-queens problem */
 let
-    var N := 8 type intArray = array of int var row := intArray [ N ] of 0
+    var N := 8
+    type intArray = array of int
+    var row := intArray [ N ] of 0
     var col := intArray [ N ] of 0
     var diagl := intArray [N+N-l] of 0
     var diag2 := intArray [N+N-l] of 0

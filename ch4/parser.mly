@@ -1,7 +1,7 @@
 %{
 
 open Absyn
-let sym = Symbol.Symbol.sym
+let sym = Symbol.sym
 
 %}
 
@@ -47,7 +47,7 @@ exp:
     | WHILE e1 = exp DO e2 = exp { WhileExp (e1, e2, $startpos) }
     | BREAK { BreakExp $startpos }
     | MINUS e = exp %prec UMINUS { e }  (* XXX *)
-    | s = ID RPAREN me = maybeexp LPAREN { CallExp (sym s, me, $startpos)  }
+    | s = ID RPAREN zm = zeromanyexp LPAREN { CallExp (sym s, zm, $startpos)  }
     | a = arith { a }
     | c = comparison { c }
     | b = boolean { b }
@@ -56,10 +56,13 @@ expseq:
     | e = exp { [(e, $startpos)] }
     | e = exp SEMICOLON es = expseq { (e, $startpos)::es }
 
-
 decs:
     | { [] }
     | d = dec ds = decs { d::ds }
+
+zeromanyexp:
+    | { [] }
+    | e = exp me = maybeexp { e::me }
 
 maybeexp:
     | { [] }
@@ -111,9 +114,14 @@ moretyfields:
 
 vardec:
     | VAR s = ID ASSIGN e = exp {
-        VarDec { name = sym s; escape = ref false; typ = None; init = e; pos = $startpos }}
+        VarDec { name = sym s; escape = ref false; typ = None;
+                 init = e; pos = $startpos }}
     | VAR s = ID ASSIGN t = ID RBRACK e = exp LBRACK {
-        VarDec { name = sym s; escape = ref false; typ = Some (sym t, $startpos); init = e; pos = $startpos }}
+        VarDec { name = sym s; escape = ref false; typ = Some (sym t, $startpos);
+                 init = e; pos = $startpos }}
+    | VAR s = ID ASSIGN t = ID RBRACK e1 = exp LBRACK OF e2 = exp {
+        VarDec { name = sym s; escape = ref false; typ = Some (sym t, $startpos);
+                 init = ArrayExp (sym t, e1, e2, $startpos) ; pos = $startpos }}
 
 fundec:
     | FUNCTION s = ID RPAREN tf = tyfields LPAREN EQ e = exp {

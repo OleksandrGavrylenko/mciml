@@ -1,6 +1,7 @@
 open Core.Std
 open Lexer
 open Lexing
+open Absyn
 
 let filename = Sys.argv.(1)
 
@@ -8,7 +9,8 @@ let () =
     let inBuffer = open_in filename in
     let lineBuffer = Lexing.from_channel inBuffer in
     try
-        let program = Parser.program Lexer.read lineBuffer in print_endline "Success!"
+        let program = Parser.program Lexer.read lineBuffer in
+        Format.printf "%s\n" (show_exp program)
     with
         | Lexer.SyntaxError msg -> Printf.fprintf stderr "%s%!\n" msg
         | Parser.Error -> begin
