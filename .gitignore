@@ -3,5 +3,8 @@
 *.cmi
 *.cmx
 *.cmo
+_build
+*.native
+
 tiger
 tiger.tar
