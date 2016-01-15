@@ -1,9 +1,10 @@
 open Symbol
 
+
 type pos = Lexing.position
 
-let pp_pos fmt pos = ()
-(* skip pretty-printing of position for now *)
+let pp_pos ppf ({pos_fname; pos_lnum; pos_bol; pos_cnum}: pos) = Format.fprintf ppf "Posn: l%d c%d" pos_lnum pos_bol
+let show_pos pos = pp_pos Format.str_formatter pos; Format.flush_str_formatter ()
 
 type var = SimpleVar of symbol * pos
          | FieldVar of var * symbol * pos
@@ -12,6 +13,7 @@ type var = SimpleVar of symbol * pos
 
 and exp = VarExp of var
         | NilExp
+        | UnitExp
         | IntExp of int
         | StringExp of string * pos
         | CallExp of symbol * exp list * pos
@@ -41,17 +43,17 @@ and oper = PlusOp | MinusOp | TimesOp | DivideOp
          | EqOp | NeqOp | LtOp | LeOp | GtOp | GeOp
          [@@deriving show]
 
-and field = {name: symbol; escape: bool ref; typ: symbol; pos: pos}
+and field = {fldname: symbol; fldescape: bool ref; fldtyp: symbol; fldpos: pos}
             [@@deriving show]
 
-and fundec = {name: symbol; params: field list;
+and fundec = {fname: symbol; params: field list;
 		      result: (symbol * pos) option;
-		      body: exp; pos: pos}
+		      body: exp; fpos: pos}
              [@@deriving show]
 
-and vardec = {name: symbol;
-              escape: bool ref;
-              typ: (symbol * pos) option;
+and vardec = {vname: symbol;
+              vescape: bool ref;
+              vtyp: (symbol * pos) option;
               init: exp;
-              pos: pos}
+              vpos: pos}
              [@@deriving show]

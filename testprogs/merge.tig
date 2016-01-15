@@ -1,4 +1,11 @@
 let
+   /* dummy functions */
+   function print(s: string) = ()
+   function flush() = ()
+   function getchar() : string = "meh"
+   function ord(s: string) : int = 1
+   function chr(i: int) : string = "meh"
+
   type any = {any : int}
   var buffer := getchar()
 
@@ -13,7 +20,7 @@ let
         any.any := isdigit(buffer);
         while isdigit(buffer) do
           (i := i*10+ord(buffer)-ord("0");
-          buffer := getcharU);
+          buffer := getchar());
         i
     end
 
@@ -46,7 +53,7 @@ let
     if l = nil then print("\n")
     else (printint(l.first); print(" "); printlist(l.rest) )
 
-  in printlist(merge(readlist()))
+  in printlist(merge(readlist(), readlist()))
 
 end
 
