@@ -111,7 +111,15 @@ let rec transExp venv tenv =
 
 and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:update_env
 
-and update_env (venv, tenv) dec = match dec with
+and update_env (venv, tenv) dec =
+
+    let mkRecord fields =
+        let mkrec ({name; typ; _}: A.field) =
+          let Some ty = Symbol.find tenv typ in
+            (name, ty) in
+        Types.Record (List.map fields mkrec, ref ()) in
+
+    match dec with
     | A.FunctionDec fundec -> (venv, tenv)
     | A.VarDec {name; typ=tyopt; init=exp; _} ->
         let {exp; ty} = transExp venv tenv exp in
@@ -123,16 +131,31 @@ and update_env (venv, tenv) dec = match dec with
             end
           | None -> () in
         (Symbol.enter venv name (Env.VarEntry ty), tenv)
-    | A.TypeDec (sym, ty, pos) -> (venv, tenv)
+    | A.TypeDec (sym, ty, pos) -> match ty with
+       | A.NameTy (typnm, pos) -> (venv, tenv)
+       | A.RecordTy fields -> (venv, Symbol.enter tenv sym (mkRecord fields))
+       | A.ArrayTy (typnm, pos) ->
+            let arrty = match Symbol.find tenv typnm with
+              | Some ty -> Types.Array (ty, ref ())
+              | None -> raise Types.TypeNotFound in
+            (venv, Symbol.enter tenv sym arrty)
+
 
 
 let testast = Tigparse.parse_string "let var i: int := 0 in i := i + 1 end"
 let testast2 = Tigparse.parse_string "let var s: string := \"Hello\" in s end"
+let testast3 = Tigparse.parse_string "
+   let
+     type i = {first: int, rest: string}
+     type arr = array of int
+     var s: string := \"Hello\"
+   in s; i end"
 
 let () =
     print_endline "Testing AST:";
     Tigparse.print_ast testast;
     Tigparse.print_ast testast2;
+    Tigparse.print_ast testast3;
     transExp Env.base_venv Env.base_tenv testast;
     print_endline "Didn't break!"
 
@@ -144,4 +167,3 @@ let () =
             | LetExp of dec list * exp * pos
             | ArrayExp of symbol * exp * exp * pos
 *)
-
