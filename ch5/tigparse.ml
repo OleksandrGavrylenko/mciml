@@ -20,7 +20,3 @@ let parse lexbuf =
 let parse_file fname = parse (Lexing.from_channel (open_in fname))
 let parse_string s = parse (Lexing.from_string s)
 let print_ast ast = Format.printf "%s\n" (show_exp ast)
-
-let () = if Array.length Sys.argv > 1
-         then print_ast (parse_file Sys.argv.(1))
-         else print_ast (parse_string "1+1")

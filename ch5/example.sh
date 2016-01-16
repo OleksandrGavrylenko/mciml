@@ -1,2 +1,3 @@
-ocamlbuild -use-menhir -use-ocamlfind -pkg core -pkg ppx_deriving.std -tag thread tigparse.native
-./tigparse.native ../testprogs/merge.tig
+ocamlbuild -clean
+ocamlbuild -use-menhir -use-ocamlfind -pkg core -pkg ppx_deriving.std -tag thread semant.native
+./semant.native

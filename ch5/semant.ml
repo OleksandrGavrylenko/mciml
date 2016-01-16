@@ -1,3 +1,5 @@
+open Core.Std
+
 module Env : sig
     type access
     type ty = Types.ty
@@ -8,7 +10,14 @@ end = struct
     type ty = Types.ty
     type access = unit
     type enventry = VarEntry of ty | FunEntry of (ty list * ty)
-    let base_tenv = Symbol.empty
+
+    let base_tenv =
+      let intsym = Symbol.sym "int"
+      and strsym = Symbol.sym "string"
+      and m = Symbol.empty in
+      let m = Symbol.enter m intsym Types.Int in
+      Symbol.enter m strsym Types.String
+
     let base_venv = Symbol.empty
 end
 
@@ -21,19 +30,19 @@ type expty = {exp: Translate.exp; ty: Types.ty}
 (*
 transVar: venv * tenv * Absyn.var -> expty
 transExp: venv * tenv * Absyn.exp -> expty
-transDec: venv * tenv * Absyn.dec -> {venv: venv, tenv: tenv}
+transDec: venv * tenv * Absyn.dec -> (venv, tenv)
 transTy: tenv * Absyn.ty -> Types.ty
 *)
 
-let checkInt {exp=_; ty=ty} pos = assert (ty == Types.Int)
-let assertEq v1 v2 = assert (v1 == v2)
-let unwrap {exp=_; ty=ty} = ty
+let checkInt {exp=_; ty=ty} pos = assert (phys_equal ty Types.Int)
+let assertEq v1 v2 = assert (phys_equal v1 v2)
+let unwrap {ty;_} = ty
 
 let rec get_record_type rcds sym = match rcds with
-    | (sym2, ty)::rest -> if sym == sym2 then {exp=(); ty=ty} else get_record_type rest sym
+    | (sym2, ty)::rest -> if phys_equal sym sym2 then {exp=(); ty=ty} else get_record_type rest sym
     | [] -> raise Types.TypeNotFound
 
-let transExp venv tenv =
+let rec transExp venv tenv =
     let rec trexp = function
         | A.VarExp v -> trvar v
         | A.NilExp -> {exp=(); ty=Types.Nil}
@@ -43,9 +52,13 @@ let transExp venv tenv =
             match Symbol.find tenv sym with
             | Some ty -> let Types.Record (flds, _) = ty in
                 check_record_types flds rcds; {exp=(); ty=ty}
-            | None -> raise Types.TypeNotFound;
+            | None -> raise Types.TypeNotFound
           end
-        (*| A.CallExp(sym, exps, pos) ->*)
+        | A.CallExp(sym, exps, pos) -> begin
+            match Symbol.find venv sym with
+            | Some Env.FunEntry (argtys, rtnty) -> check_func_call argtys exps; {exp=(); ty=rtnty}
+            | None -> raise Types.TypeNotFound
+          end
         | A.SeqExp exprs -> begin
             match exprs with
             | (e, _)::exps -> trexp e; trexp (A.SeqExp exps)
@@ -58,12 +71,21 @@ let transExp venv tenv =
                 {exp=(); ty=Types.Int}
             end
         | A.AssignExp(var, exp, pos) -> check_assignment var exp
+        | A.LetExp (decs, exp, pos) -> 
+            let (venvupd, tenvupd) = transDecs venv tenv decs in
+            transExp venvupd tenvupd exp
 
     and check_record_types wanted found = match (wanted, found) with
         | ((sym1, ty1)::wntd, (sym2, exp, pos)::fnd) -> 
             assertEq sym1 sym2;
             assertEq ty1 (unwrap (trexp exp));
             check_record_types wntd fnd
+        | (x::xs, []) -> raise Types.TypeNotFound
+        | ([], x::xs) -> raise Types.TypeNotFound
+        | ([], []) -> ()
+
+    and check_func_call argtys exps = match (argtys, exps) with
+        | (ty::args, e::exps) -> assertEq ty (unwrap (trexp e)); check_func_call args exps
         | (x::xs, []) -> raise Types.TypeNotFound
         | ([], x::xs) -> raise Types.TypeNotFound
         | ([], []) -> ()
@@ -87,17 +109,34 @@ let transExp venv tenv =
             in checkInt (trexp exp); {exp=(); ty=ty}
     in trexp
 
-let testast = print_endline "Parsing";
-              Tigparse.parse_file "../testprogs/simplemaths.tig"
+and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:update_env
+
+and update_env (venv, tenv) dec = match dec with
+    | A.FunctionDec fundec -> (venv, tenv)
+    | A.VarDec {name; typ=tyopt; init=exp; _} ->
+        let {exp; ty} = transExp venv tenv exp in
+        let () = match tyopt with 
+          | Some (sym, pos) -> begin
+              match Symbol.find tenv sym with
+                | Some tydef -> assertEq tydef ty
+                | None -> raise Types.TypeNotFound
+            end
+          | None -> () in
+        (Symbol.enter venv name (Env.VarEntry ty), tenv)
+    | A.TypeDec (sym, ty, pos) -> (venv, tenv)
+
+
+let testast = Tigparse.parse_string "let var i: int := 0 in i := i + 1 end"
+let testast2 = Tigparse.parse_string "let var s: string := \"Hello\" in s end"
 
 let () =
-    print_endline "Testing AST";
+    print_endline "Testing AST:";
+    Tigparse.print_ast testast;
+    Tigparse.print_ast testast2;
     transExp Env.base_venv Env.base_tenv testast;
     print_endline "Didn't break!"
 
 (*
-            | CallExp of symbol * exp list * pos
-            | AssignExp of var * exp * pos
             | IfExp of exp * exp * exp option * pos
             | WhileExp of exp * exp * pos
             | ForExp of symbol * bool ref * exp * exp * exp * pos
