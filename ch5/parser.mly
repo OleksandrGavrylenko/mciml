@@ -121,16 +121,22 @@ morerecordvals:
     | { [] }
     | COMMA rv = recordvals { rv }
 
+(* TODO factor out the assignment parts
+ * Can ArrayExp/RecordExp be defined higher up? Yes they can*)
 vardec:
-    | VAR s = ID ASSIGN e = exp {
-        VarDec { name = sym s; escape = ref false; typ = None;
+    | VAR s = ID tyo = tyopt ASSIGN e = exp {
+        VarDec { name = sym s; escape = ref false; typ = tyo;
                  init = e; pos = $startpos }}
-    | VAR s = ID ASSIGN t = ID RBRACE rvs = recordvals LBRACE {
-        VarDec { name = sym s; escape = ref false; typ = Some (sym t, $startpos);
+    | VAR s = ID tyo = tyopt ASSIGN t = ID RBRACE rvs = recordvals LBRACE {
+        VarDec { name = sym s; escape = ref false; typ = tyo;
                  init = RecordExp(rvs, sym t, $startpos); pos = $startpos }}
-    | VAR s = ID ASSIGN t = ID RBRACK e1 = exp LBRACK OF e2 = exp {
-        VarDec { name = sym s; escape = ref false; typ = Some (sym t, $startpos);
+    | VAR s = ID tyo = tyopt ASSIGN t = ID RBRACK e1 = exp LBRACK OF e2 = exp {
+        VarDec { name = sym s; escape = ref false; typ = tyo;
                  init = ArrayExp (sym t, e1, e2, $startpos) ; pos = $startpos }}
+
+tyopt:
+    | COLON ty = ID { Some (sym ty, $startpos) }
+    | { None }
 
 fundec:
     | FUNCTION s = ID RPAREN tf = tyfields LPAREN EQ e = exp {
