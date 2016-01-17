@@ -34,18 +34,32 @@ transDec: venv * tenv * Absyn.dec -> (venv, tenv)
 transTy: tenv * Absyn.ty -> Types.ty
 *)
 
-let checkInt {exp=_; ty=ty} pos = assert (phys_equal ty Types.Int)
-let assertEq v1 v2 = assert (phys_equal v1 v2)
+let checkInt {exp=_; ty=ty} pos = assert (ty = Types.Int)
+let assertEq v1 v2 = assert (v1 = v2)
 let unwrap {ty;_} = ty
 
 let getSym env sym = match Symbol.find env sym with
     | Some r -> r
-    | None ->
-      raise (Types.TypeNotFound sym)
+    | None -> Symbol.showKeys env; raise (Types.TypeNotFound sym)
 
 let rec get_record_type rcds sym = match rcds with
-    | (sym2, ty)::rest -> if phys_equal sym sym2 then {exp=(); ty=ty} else get_record_type rest sym
+    | (sym2, ty)::rest -> if sym = sym2 then {exp=(); ty=ty} else get_record_type rest sym
     | [] -> raise (Types.TypeNotFound sym)
+
+let transTy tenv ty =
+  let mkRecord fields =
+      print_endline "Making fields...";
+      let mkrec ({name; typ; _}: A.field) =
+          print_endline ("Making field: " ^ Symbol.name name);
+          (name, getSym tenv typ) in
+      let r = Types.Record (List.map fields mkrec, ref ()) in
+      print_endline "Done";
+      r
+  in
+  match ty with
+    | A.NameTy (typnm, pos) -> getSym tenv typnm
+    | A.RecordTy fields -> mkRecord fields
+    | A.ArrayTy (typnm, pos) -> Types.Array (getSym tenv typnm, ref ()) 
 
 let rec transExp venv tenv =
     let rec trexp = function
@@ -78,7 +92,11 @@ let rec transExp venv tenv =
 
     and check_record_types wanted found = match (wanted, found) with
         | ((sym1, ty1)::wntd, (sym2, exp, pos)::fnd) -> 
-            assertEq sym1 sym2;
+            print_endline "assert record syms";
+            print_endline (Symbol.name sym1);
+            print_endline (Symbol.name sym2);
+            assertEq (Symbol.name sym1) (Symbol.name sym2);
+            print_endline "assert record types";
             assertEq ty1 (unwrap (trexp exp));
             check_record_types wntd fnd
         | ((s,t)::xs, []) -> raise (Types.TypeNotFound s)
@@ -112,43 +130,17 @@ and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:update_
 
 and update_env (venv, tenv) dec =
 
-    let mkRecord fields =
-        print_endline "Making fields";
-        let mkrec ({name; typ; _}: A.field) =
-            print_endline ("making field:" ^ Symbol.name name);
-            (name, getSym tenv typ) in
-        let r = Types.Record (List.map fields mkrec, ref ()) in
-        print_endline "Done";
-        r
-    in
-
-    let typedec (sym, ty, pos) = match ty with
-        | A.NameTy (typnm, pos) ->
-          let ty = getSym tenv typnm in
-          (venv, Symbol.enter tenv sym ty)
-        | A.RecordTy fields -> (venv, Symbol.enter tenv sym (mkRecord fields))
-        | A.ArrayTy (typnm, pos) ->
-          let arrty = Types.Array (getSym tenv typnm, ref ()) in
-          (venv, Symbol.enter tenv sym arrty)
-
-      and funcdec {A.name; params; result; body; pos} =
-        let resty = match result with
-          | Some (name, pos) -> getSym tenv name
-          | None -> Types.Nil 
-        and transparam ({A.name; typ; _}: A.field) = (name, getSym tenv name)
-        and getTy (_, ty) = ty in
-        let params' = List.map params transparam in
-        let venv'  = Symbol.enter venv name (Env.FunEntry (List.map params' getTy, resty)) in
-        let enterparam venv (name, ty) = Symbol.enter venv name (Env.VarEntry ty) in
-        let venv'' = List.fold_left params' ~init: venv ~f: enterparam
-        in transExp venv'' tenv body; (venv', tenv)
-
-
-(*
-and fundec = {name: symbol; params: field list;
-		      result: (symbol * pos) option;
-		      body: exp; pos: pos}
-*)
+    let funcdec {A.name; params; result; body; pos} =
+      let resty = match result with
+        | Some (name, pos) -> getSym tenv name
+        | None -> Types.Nil 
+      and transparam ({A.name; typ; _}: A.field) = (name, getSym tenv name)
+      and getTy (_, ty) = ty in
+      let params' = List.map params transparam in
+      let venv'  = Symbol.enter venv name (Env.FunEntry (List.map params' getTy, resty)) in
+      let enterparam venv (name, ty) = Symbol.enter venv name (Env.VarEntry ty) in
+      let venv'' = List.fold_left params' ~init: venv ~f: enterparam
+      in transExp venv'' tenv body; (venv', tenv)
 
     in match dec with
       | A.FunctionDec fundec -> funcdec fundec
@@ -158,7 +150,7 @@ and fundec = {name: symbol; params: field list;
           | Some (sym, pos) -> assertEq (getSym tenv sym) ty
           | None -> () in
         (Symbol.enter venv name (Env.VarEntry ty), tenv)
-      | A.TypeDec t -> typedec t
+      | A.TypeDec (sym, ty, pos) -> (venv, Symbol.enter tenv sym (transTy tenv ty))
 
 
 let testast = Tigparse.parse_string "
@@ -166,23 +158,13 @@ let testast = Tigparse.parse_string "
      type arr = array of int
      type r = {first: int, rest: string}
      var s: string := \"Hello\"
+     var r1: r := r{first=10, rest=\"Hiya\"}
      var i: int := 10
    in
      s;
      i := i + i + 2 - 3 / 4 * 5;
-     r.first;
-     r.rest
-   end"
-let testast3 = Tigparse.parse_string "
-   let
-     type i = {first: int, rest: string}
-     type arr = array of int
-     var s: string := \"Hello\"
-     function readint(v: int) : string = v
-   in
-     s;
-     i.first := 10;
-     i.rest = \"Assigning to a record\"
+     r1.first;
+     r1.rest
    end"
 
 let () =

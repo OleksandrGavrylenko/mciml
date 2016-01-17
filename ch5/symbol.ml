@@ -19,8 +19,15 @@ let name (s, _) = s
 type 'a table = 'a Int.Map.t
 let empty = Int.Map.empty
 
+let showKeys map = print_endline "Keys:"; List.map (Map.keys map) (fun x -> print_endline (string_of_int x)); ()
+
 let enter t (s, n) a =
+    showKeys t;
     print_endline ("Adding symbol: " ^ s);
     Map.add t ~key:n ~data:a
 
-let find t (s, n) = Map.find t n
+let find t (s, n) =
+    showKeys t;
+    print_endline ("Finding symbol: " ^ s);
+    Map.find t n
+
