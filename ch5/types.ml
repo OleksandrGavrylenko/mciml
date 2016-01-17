@@ -1,6 +1,6 @@
 type unique = unit ref
 
-exception TypeNotFound
+exception TypeNotFound of Symbol.symbol
 
 type ty = 
         Record of (Symbol.symbol * ty) list * unique
@@ -16,7 +16,7 @@ let actual_ty ty = match ty with
           begin
             match !optty with
             | Some ty -> ty
-            | None -> raise TypeNotFound
+            | None -> raise (TypeNotFound Symbol.dummy)
           end
         | ty -> ty
 

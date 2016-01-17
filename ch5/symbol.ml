@@ -2,6 +2,7 @@ open Core.Std
 
 type symbol = string * int [@@deriving show]
 let nextsym = ref 0
+let dummy = ("Dummy", -1)
 let table = String.Table.create ()
 
 let sym name = match Hashtbl.find table name with
@@ -17,5 +18,9 @@ let name (s, _) = s
 
 type 'a table = 'a Int.Map.t
 let empty = Int.Map.empty
-let enter t (s, n) a = Map.add t ~key:n ~data:a
+
+let enter t (s, n) a =
+    print_endline ("Adding symbol: " ^ s);
+    Map.add t ~key:n ~data:a
+
 let find t (s, n) = Map.find t n

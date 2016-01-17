@@ -2,6 +2,7 @@ type symbol
 
 val sym : string -> symbol
 val name : symbol -> string
+val dummy : symbol
 val pp_symbol : Format.formatter -> symbol -> unit
 
 type 'a table
