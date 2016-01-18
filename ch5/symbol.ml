@@ -16,10 +16,17 @@ let sym name = match Hashtbl.find table name with
 
 let name (s, _) = s
 
+let reverseFind intval : string option = Hashtbl.fold table ~init:None ~f:(fun ~key:k ~data:v acc -> if v = intval then Some k else acc)
+
 type 'a table = 'a Int.Map.t
 let empty = Int.Map.empty
 
-let showKeys map = print_endline "Keys:"; List.map (Map.keys map) (fun x -> print_endline (string_of_int x)); ()
+let showKeys map =
+    print_endline "Keys:";
+    List.map (Map.keys map) (fun x ->
+        let Some v = reverseFind x in
+        Format.printf "%s (%d)@." v x);
+    ()
 
 let enter t (s, n) a =
     showKeys t;

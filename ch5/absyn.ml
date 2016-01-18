@@ -1,9 +1,10 @@
 open Symbol
 
+
 type pos = Lexing.position
 
-let pp_pos fmt pos = ()
-(* skip pretty-printing of position for now *)
+let pp_pos ppf ({pos_fname; pos_lnum; pos_bol; pos_cnum}: pos) = Format.fprintf ppf "Posn: l%d c%d" pos_lnum pos_bol
+let show_pos pos = pp_pos Format.str_formatter pos; Format.flush_str_formatter ()
 
 type var = SimpleVar of symbol * pos
          | FieldVar of var * symbol * pos
@@ -12,6 +13,7 @@ type var = SimpleVar of symbol * pos
 
 and exp = VarExp of var
         | NilExp
+        | UnitExp
         | IntExp of int
         | StringExp of string * pos
         | CallExp of symbol * exp list * pos

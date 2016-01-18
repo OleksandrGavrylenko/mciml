@@ -34,12 +34,13 @@ program: e = exp EOF { e }
 
 exp:
     | LET d = decs IN es = expseq END { LetExp (d, SeqExp es, $startpos)  }
+    | LET d = decs IN END { LetExp (d, UnitExp, $startpos)  }
     | i = INT { IntExp i }
     | s = STRING { StringExp (s, $startpos) }
     | v = lvalue { VarExp v }
     | s = ID RBRACE rvs = recordvals LBRACE { RecordExp(rvs, sym s, $startpos) }
     | NIL { NilExp }
-    | RPAREN LPAREN { NilExp }
+    | RPAREN LPAREN { UnitExp }
     | RPAREN es = expseq LPAREN { SeqExp es }
     | v = lvalue ASSIGN e = exp { AssignExp (v, e, $startpos) }
     | IF e1 = exp THEN e2 = exp { IfExp (e1, e2, None, $startpos) }
@@ -127,9 +128,6 @@ vardec:
     | VAR s = ID tyo = tyopt ASSIGN e = exp {
         VarDec { name = sym s; escape = ref false; typ = tyo;
                  init = e; pos = $startpos }}
-    | VAR s = ID tyo = tyopt ASSIGN t = ID RBRACE rvs = recordvals LBRACE {
-        VarDec { name = sym s; escape = ref false; typ = tyo;
-                 init = RecordExp(rvs, sym t, $startpos); pos = $startpos }}
     | VAR s = ID tyo = tyopt ASSIGN t = ID RBRACK e1 = exp LBRACK OF e2 = exp {
         VarDec { name = sym s; escape = ref false; typ = tyo;
                  init = ArrayExp (sym t, e1, e2, $startpos) ; pos = $startpos }}
