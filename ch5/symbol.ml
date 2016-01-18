@@ -16,25 +16,22 @@ let sym name = match Hashtbl.find table name with
 
 let name (s, _) = s
 
-let reverseFind intval : string option = Hashtbl.fold table ~init:None ~f:(fun ~key:k ~data:v acc -> if v = intval then Some k else acc)
+let reverseFind intval : string option = Hashtbl.fold table ~init:None ~f:(
+    fun ~key:k ~data:v acc -> if v = intval then Some k else acc)
 
 type 'a table = 'a Int.Map.t
 let empty = Int.Map.empty
 
 let showKeys map =
     print_endline "Keys:";
-    List.map (Map.keys map) (fun x ->
+    let _ = List.map (Map.keys map) (fun x ->
         let Some v = reverseFind x in
-        Format.printf "%s (%d)@." v x);
+        Format.printf "%s (%d)@." v x) in
     ()
 
 let enter t (s, n) a =
-    showKeys t;
-    print_endline ("Adding symbol: " ^ s);
     Map.add t ~key:n ~data:a
 
 let find t (s, n) =
-    showKeys t;
-    print_endline ("Finding symbol: " ^ s);
     Map.find t n
 

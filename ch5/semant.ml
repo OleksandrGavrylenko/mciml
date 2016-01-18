@@ -56,12 +56,9 @@ let rec get_record_type rcds sym = match rcds with
 
 let transTy tenv ty =
   let mkRecord fields =
-      print_endline "Making fields...";
-      let mkrec ({name; typ; _}: A.field) =
-          print_endline ("Making field: " ^ Symbol.name name);
-          (name, getSym tenv typ) in
+      let mkrec ({fldname; fldtyp; _}: A.field) =
+          (fldname, getSym tenv fldtyp) in
       let r = Types.Record (List.map fields mkrec, ref ()) in
-      print_endline "Done";
       r
   in
   match ty with
@@ -84,12 +81,9 @@ let rec transExp venv tenv =
             let Env.FunEntry (argtys, rtnty) = getSym venv sym in
             check_func_call argtys exps pos; wrap rtnty
         | A.SeqExp exprs ->
-            print_endline "here";
-            print_endline (string_of_int (List.length exprs));
             List.fold_left exprs ~init: (wrap Types.Unit) ~f: (fun ty (expr, pos) -> trexp expr)
         | A.OpExp(left, op, right, pos) -> begin
-                checkInt (trexp left) pos;
-                checkInt (trexp right) pos;
+                assertTyEq (unwrap (trexp left)) (unwrap (trexp right)) pos;
                 wrap Types.Int
             end
         | A.AssignExp(var, exp, pos) -> check_assignment var exp pos
@@ -111,7 +105,7 @@ let rec transExp venv tenv =
           checkInt (trexp assignexp) pos;
           checkInt (trexp toexp) pos;
           let (venv', tenv') = transDec (venv, tenv) (A.VarDec
-          {name=sym; escape=ref false; typ=None; init=assignexp; pos=pos}) in
+          {vname=sym; vescape=ref false; vtyp=None; init=assignexp; vpos=pos}) in
           assertTyEq (unwrap (transExp venv' tenv' loopexp)) Types.Unit pos;
           wrap Types.Unit
         | A.BreakExp (pos) -> wrap Types.Unit
@@ -122,8 +116,6 @@ let rec transExp venv tenv =
 
     and check_record_types wanted found = match (wanted, found) with
         | ((sym1, ty1)::wntd, (sym2, exp, pos)::fnd) -> 
-            print_endline (Symbol.name sym1);
-            print_endline (Symbol.name sym2);
             assertEq (Symbol.name sym1) (Symbol.name sym2);
             assertTyEq (unwrap (trexp exp)) ty1 pos;
             check_record_types wntd fnd
@@ -142,7 +134,6 @@ let rec transExp venv tenv =
     and check_assignment var exp pos =
         let ty1 = unwrap (trvar var)
         and ty2 = unwrap (trexp exp) in
-        Format.printf "t1: %s t2: %s@." (Types.show_ty ty1) (Types.show_ty ty2);
         assertTyEq ty2 ty1 pos;
         wrap Types.Unit
 
@@ -155,31 +146,31 @@ let rec transExp venv tenv =
             get_record_type rcds sym
         | A.SubscriptVar (var, exp, pos) ->
             let {exp=_; ty=Types.Array (ty, _)} = trvar var
-            in checkInt (trexp exp); wrap ty
+            in checkInt (trexp exp) pos; wrap ty
     in trexp
 
 and transDec (venv, tenv) dec =
-  let funcdec {A.name; params; result; body; pos} =
+  let funcdec {A.fname; params; result; body; fpos} =
     let resty = match result with
       | Some (name, pos) -> getSym tenv name
       | None -> Types.Unit 
-    and transparam ({A.name; typ; _}: A.field) = (name, getSym tenv typ)
+    and transparam ({A.fldname; fldtyp; _}: A.field) = (fldname, getSym tenv fldtyp)
     and getTy (_, ty) = ty in
     let params' = List.map params transparam in
-    let venv' = Symbol.enter venv name (Env.FunEntry (List.map params' getTy, resty))
+    let venv' = Symbol.enter venv fname (Env.FunEntry (List.map params' getTy, resty))
     and enterparam env (name, ty) = Symbol.enter env name (Env.VarEntry ty) in
     let venv'' = List.fold_left params' ~init: venv' ~f: enterparam in
-    assertTyEq (unwrap (transExp venv'' tenv body)) resty pos;
+    assertTyEq (unwrap (transExp venv'' tenv body)) resty fpos;
     (venv', tenv)
 
   in match dec with
     | A.FunctionDec fundec -> funcdec fundec
-    | A.VarDec {name; typ=tyopt; init=exp; _} ->
+    | A.VarDec {vname; vtyp=tyopt; init=exp; _} ->
       let {exp; ty} = transExp venv tenv exp in
       let () = match tyopt with 
         | Some (sym, pos) -> assertTyEq (getSym tenv sym) ty pos
         | None -> () in
-      (Symbol.enter venv name (Env.VarEntry ty), tenv)
+      (Symbol.enter venv vname (Env.VarEntry ty), tenv)
     | A.TypeDec (sym, ty, pos) -> (venv, Symbol.enter tenv sym (transTy tenv ty))
 
 and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:transDec

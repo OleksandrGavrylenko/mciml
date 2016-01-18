@@ -13,7 +13,7 @@ let next_line lexbuf =
 }
 
 let digit = ['0'-'9']
-let int_ = '-'? digit+
+let int_ = digit+
 let newline = '\r' | '\n' | "\r\n"
 let white = [' ' '\t']+
 let id = ['a' - 'z' 'A' - 'Z' '_'] ['a' - 'z' 'A' - 'Z' '0' - '9' '_']*

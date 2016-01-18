@@ -43,17 +43,17 @@ and oper = PlusOp | MinusOp | TimesOp | DivideOp
          | EqOp | NeqOp | LtOp | LeOp | GtOp | GeOp
          [@@deriving show]
 
-and field = {name: symbol; escape: bool ref; typ: symbol; pos: pos}
+and field = {fldname: symbol; fldescape: bool ref; fldtyp: symbol; fldpos: pos}
             [@@deriving show]
 
-and fundec = {name: symbol; params: field list;
+and fundec = {fname: symbol; params: field list;
 		      result: (symbol * pos) option;
-		      body: exp; pos: pos}
+		      body: exp; fpos: pos}
              [@@deriving show]
 
-and vardec = {name: symbol;
-              escape: bool ref;
-              typ: (symbol * pos) option;
+and vardec = {vname: symbol;
+              vescape: bool ref;
+              vtyp: (symbol * pos) option;
               init: exp;
-              pos: pos}
+              vpos: pos}
              [@@deriving show]

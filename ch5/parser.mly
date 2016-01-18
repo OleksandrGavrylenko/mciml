@@ -108,7 +108,7 @@ ty:
 tyfields:
     | { [] }
     | s1 = ID COLON s2 = ID mtf = moretyfields {
-        {name = sym s1; escape = ref false; typ = sym s2; pos = $startpos}::mtf }
+        {fldname = sym s1; fldescape = ref false; fldtyp = sym s2; fldpos = $startpos}::mtf }
 
 moretyfields:
     | { [] }
@@ -126,11 +126,11 @@ morerecordvals:
  * Can ArrayExp/RecordExp be defined higher up? Yes they can*)
 vardec:
     | VAR s = ID tyo = tyopt ASSIGN e = exp {
-        VarDec { name = sym s; escape = ref false; typ = tyo;
-                 init = e; pos = $startpos }}
+        VarDec { vname = sym s; vescape = ref false; vtyp = tyo;
+                 init = e; vpos = $startpos }}
     | VAR s = ID tyo = tyopt ASSIGN t = ID RBRACK e1 = exp LBRACK OF e2 = exp {
-        VarDec { name = sym s; escape = ref false; typ = tyo;
-                 init = ArrayExp (sym t, e1, e2, $startpos) ; pos = $startpos }}
+        VarDec { vname = sym s; vescape = ref false; vtyp = tyo;
+                 init = ArrayExp (sym t, e1, e2, $startpos) ; vpos = $startpos }}
 
 tyopt:
     | COLON ty = ID { Some (sym ty, $startpos) }
@@ -138,6 +138,6 @@ tyopt:
 
 fundec:
     | FUNCTION s = ID RPAREN tf = tyfields LPAREN EQ e = exp {
-        FunctionDec { name = sym s; params = tf; result = None; body = e; pos = $startpos} }
+        FunctionDec { fname = sym s; params = tf; result = None; body = e; fpos = $startpos} }
     | FUNCTION s = ID RPAREN tf = tyfields LPAREN COLON s2 = ID EQ e = exp {
-        FunctionDec { name = sym s; params = tf; result = Some(sym s2, $startpos); body = e; pos = $startpos} }
+        FunctionDec { fname = sym s; params = tf; result = Some(sym s2, $startpos); body = e; fpos = $startpos} }

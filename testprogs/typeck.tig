@@ -11,9 +11,13 @@ let
  
   function myfunc(k: int) : int =
     let var l: int := 10 in l end
+
+  function thingy(k: r) : int =
+    let var l: int := 10 in l end
 in
   s;
   i := i + i + 2 - 3 / 4 * 5;
+  i := i-1;
   r1.first;
   r1.rest;
   if i > 0 then i := i * i;

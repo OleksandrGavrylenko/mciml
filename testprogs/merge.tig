@@ -1,4 +1,10 @@
 let
+   /* dummy functions */
+   function print(s: string) = ()
+   function flush() = ()
+   function getchar() : string = "meh"
+   function ord(s: string) : int = 1
+
   type any = {any : int}
   var buffer := getchar()
 
@@ -13,7 +19,7 @@ let
         any.any := isdigit(buffer);
         while isdigit(buffer) do
           (i := i*10+ord(buffer)-ord("0");
-          buffer := getcharU);
+          buffer := getchar());
         i
     end
 
