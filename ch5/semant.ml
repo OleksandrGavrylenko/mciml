@@ -47,19 +47,22 @@ let unwrap {ty;_} = ty
 let wrap ty = {exp=(); ty=ty}
 
 let getSym env sym = match Symbol.find env sym with
-    | Some r -> r
-    | None -> Symbol.showKeys env; raise (Types.TypeNotFound (sym, Lexing.dummy_pos))
+  | Some r -> r
+  | None -> raise (Types.TypeNotFound (sym, Lexing.dummy_pos))
 
 let rec get_record_type rcds sym = match rcds with
-    | (sym2, ty)::rest -> if sym = sym2 then wrap ty else get_record_type rest sym
-    | [] -> raise (Types.TypeNotFound (sym, Lexing.dummy_pos))
+  | (sym2, ty)::rest -> if sym = sym2 then wrap ty else get_record_type rest sym
+  | [] -> raise (Types.TypeNotFound (sym, Lexing.dummy_pos))
 
 let transTy tenv ty =
   let mkRecord fields =
-      let mkrec ({fldname; fldtyp; _}: A.field) =
-          (fldname, getSym tenv fldtyp) in
-      let r = Types.Record (List.map fields mkrec, ref ()) in
-      r
+    let mkrec ({fldname; fldtyp; _}: A.field) =
+      let provty = match Symbol.find tenv fldtyp with
+        | Some ty -> ty
+        | None -> Types.Name (fldty, None) in
+      (fldname, provty) in
+    let r = Types.Record (List.map fields mkrec, ref ()) in
+    r
   in
   match ty with
     | A.NameTy (typnm, pos) -> getSym tenv typnm

@@ -1,33 +1,24 @@
 let
-  var v1 := 1
-  var v2 := v1 - 1
-  type intArr = array of int
-  type r = {first: int, rest: string}
-  var s: string := "Hello"
-  var r1: r := r{first=10, rest="Hiya"}
   var i: int := 10
-  var j: int := 10
-  var arr: intArr := intArr[j + j] of 0
+  var s: string := "Hello"
+  type intArr = array of int
+  var arr: intArr := intArr[i-i] of 0
+
+  type r = {first: int, rest: int, other: string, another: r}
+  var r1: r := r{first=10, rest=0, other="Hiya", another=nil}
  
   function myfunc(k: int) : int =
     let var l: int := 10 in l end
 
-  function thingy(k: r) : int =
-    let var l: int := 10 in l end
+  function reccy(k: int) : int =
+    if k > 10 then reccy(k + 1) else k
 in
-  s;
-  i := i + i + 2 - 3 / 4 * 5;
-  i := i-1;
-  r1.first;
-  r1.rest;
+  i := i+i+(2-3)/4*5;
+  let var x := r1.first + r1.rest in 2*x end;
   if i > 0 then i := i * i;
   if i > 0 then i + 1 else i - 1;
   while i = 10 do i := i + 10;
-  break; /* obviously this should fail */
+  break; /* XXX obviously this should fail */
   for k := 10 to 20 do (k + 1; i := i + 10);
-  for m := 10 to 20 do i := i + 10;
-  for m := 10 to 25 do i := i + 10;
-  j := 10;
-  arr[10] := j;
-  j
+  i := 10; arr[10] := i; i
 end
