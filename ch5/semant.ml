@@ -35,8 +35,9 @@ transTy: tenv * Absyn.ty -> Types.ty
 *)
 
 
-let assertTyEq ty1 ty2 pos =
-  if (ty1 <> ty2) then raise (Types.UnexpectedType (ty1, ty2, pos))
+let assertTyEq found expect pos =
+  if (found <> expect) then
+    raise (Types.UnexpectedType (found, expect, pos))
 
 let checkInt {exp=_; ty=ty} pos = assertTyEq ty Types.Int pos
 
@@ -81,19 +82,17 @@ let rec transExp venv tenv =
             check_record_types flds rcds; wrap ty
         | A.CallExp(sym, exps, pos) ->
             let Env.FunEntry (argtys, rtnty) = getSym venv sym in
-            check_func_call argtys exps; wrap rtnty
-        | A.SeqExp exprs -> begin
-            match exprs with
-            | (e, _)::exps -> trexp e; trexp (A.SeqExp exps)
-            | [(e, _)] -> trexp e
-            | [] -> wrap Types.Unit
-          end
+            check_func_call argtys exps pos; wrap rtnty
+        | A.SeqExp exprs ->
+            print_endline "here";
+            print_endline (string_of_int (List.length exprs));
+            List.fold_left exprs ~init: (wrap Types.Unit) ~f: (fun ty (expr, pos) -> trexp expr)
         | A.OpExp(left, op, right, pos) -> begin
                 checkInt (trexp left) pos;
                 checkInt (trexp right) pos;
                 wrap Types.Int
             end
-        | A.AssignExp(var, exp, pos) -> check_assignment var exp
+        | A.AssignExp(var, exp, pos) -> check_assignment var exp pos
         | A.LetExp (decs, exp, pos) -> 
             let (venvupd, tenvupd) = transDecs venv tenv decs in
             transExp venvupd tenvupd exp
@@ -111,7 +110,9 @@ let rec transExp venv tenv =
         | A.ForExp(sym, _, assignexp, toexp, loopexp, pos) ->
           checkInt (trexp assignexp) pos;
           checkInt (trexp toexp) pos;
-          assertTyEq (unwrap (trexp loopexp)) Types.Unit pos;
+          let (venv', tenv') = transDec (venv, tenv) (A.VarDec
+          {name=sym; escape=ref false; typ=None; init=assignexp; pos=pos}) in
+          assertTyEq (unwrap (transExp venv' tenv' loopexp)) Types.Unit pos;
           wrap Types.Unit
         | A.BreakExp (pos) -> wrap Types.Unit
         | A.ArrayExp(sym, ctexp, initexp, pos) ->
@@ -130,18 +131,20 @@ let rec transExp venv tenv =
         | ([], (s,_,_)::xs) -> raise (Types.TypeNotFound (s, Lexing.dummy_pos))
         | ([], []) -> ()
 
-    and check_func_call argtys exps = match (argtys, exps) with
+    and check_func_call argtys exps pos = match (argtys, exps) with
         | (ty::args, e::exps) ->
-          assertTyEq (unwrap (trexp e)) ty;
-          check_func_call args exps
+          assertTyEq (unwrap (trexp e)) ty pos;
+          check_func_call args exps pos
         | (x::xs, []) -> raise (Types.TypeNotFound (Symbol.dummy, Lexing.dummy_pos))
         | ([], x::xs) -> raise (Types.TypeNotFound (Symbol.dummy, Lexing.dummy_pos))
         | ([], []) -> ()
 
-    and check_assignment var exp =
+    and check_assignment var exp pos =
         let ty1 = unwrap (trvar var)
         and ty2 = unwrap (trexp exp) in
-        assertTyEq ty2 ty1; wrap Types.Unit
+        Format.printf "t1: %s t2: %s@." (Types.show_ty ty1) (Types.show_ty ty2);
+        assertTyEq ty2 ty1 pos;
+        wrap Types.Unit
 
     and trvar = function
         | A.SimpleVar(id, pos) ->
@@ -166,9 +169,7 @@ and transDec (venv, tenv) dec =
     let venv' = Symbol.enter venv name (Env.FunEntry (List.map params' getTy, resty))
     and enterparam env (name, ty) = Symbol.enter env name (Env.VarEntry ty) in
     let venv'' = List.fold_left params' ~init: venv' ~f: enterparam in
-    print_endline "Here mdear";
-    print_endline (Types.show_ty resty);
-    assertTyEq (unwrap (transExp venv'' tenv body)) resty;
+    assertTyEq (unwrap (transExp venv'' tenv body)) resty pos;
     (venv', tenv)
 
   in match dec with
@@ -183,58 +184,21 @@ and transDec (venv, tenv) dec =
 
 and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:transDec
 
-
-
-
-let testast = Tigparse.parse_string "
-   /* premably comment blah */
-   let
-     type intArr = array of int
-     type r = {first: int, rest: string}
-     var s: string := \"Hello\"
-     var r1: r := r{first=10, rest=\"Hiya\"}
-     var i: int := 10
-     var j: string := 10
-     var arr: intArr := intArr[j + j] of 0
-
-     function myfunc(k: int) : int =
-       let
-         var l: int := 10
-       in
-       end
-   in
-     s;
-     i := i + i + 2 - 3 / 4 * 5;
-     r1.first;
-     r1.rest;
-     while i = 10 do i := i + 10;
-     if i > 0 then i := i * i;
-     if i > 0 then i + 1 else i - 1;
-     for k := 10 to 20 do i := i + 10;
-     j := \"OIoi\";
-     arr[10] := j;
-     j
-   end"
-
-let testast2 = Tigparse.parse_string "
-   let
-     function myfunc() =
-       let
-         var l: int := 10
-       in
-         \"heeeeello\"
-       end
-   in
-   end"
-
-let () =
-    print_endline "Testing AST:";
-    Tigparse.print_ast testast;
+let typeck ast =
+    print_endline "Type-checking AST:";
+    Tigparse.print_ast ast;
     try
-      let _ = transExp Env.base_venv Env.base_tenv testast in ()
+      let _ = transExp Env.base_venv Env.base_tenv ast in 
+      print_endline "Type-checking successful"
     with
       | Types.TypeNotFound (sym, pos) ->
-        Format.printf "Error at %s - unknown symbol: %s" (A.show_pos pos) (Symbol.name sym)
+        Format.printf "Error at %s - unknown symbol: %s@." (A.show_pos pos) (Symbol.name sym)
       | Types.UnexpectedType (found, expect, pos) ->
-        Format.printf "Error at %s - expected type %s but found type %s@." (A.show_pos pos) (Types.show_ty found) (Types.show_ty expect) 
+        Format.printf "Error at %s - expected type %s but found type %s@." (A.show_pos pos) (Types.show_ty expect) (Types.show_ty found) 
 
+let typeck_file fname = typeck (Tigparse.parse (Lexing.from_channel (open_in fname)))
+let typeck_string s = typeck (Tigparse.parse (Lexing.from_string s))
+
+let () = if Array.length Sys.argv > 1 then
+  let filename = Sys.argv.(1) in
+  typeck_file filename
