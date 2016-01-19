@@ -3,6 +3,8 @@ let
   var s: string := "Hello"
   type intArr = array of int
   var arr: intArr := intArr[i-i] of 0
+  type myrcd = {this: int, that: int}
+  var rcd: myrcd := nil
 
   type r = {first: int, rest: int, other: string, another: r}
   var r1: r := r{first=10, rest=0, other="Hiya", another=nil}
@@ -10,9 +12,17 @@ let
   function myfunc(k: int) : int =
     let var l: int := 10 in l end
 
-  function reccy(k: int) : int =
-    if k > 10 then reccy(k + 1) else k
+  function reccy0(k: int) : int =
+    if k < 10 then reccy0(k + 1) else k
+
+  function reccy1(j: int) : int =
+    if j < 10 then reccy2(j + 1) else j 
+
+  function reccy2(j: int) : int =
+    if j < 10 then reccy1(j + 1) else j 
+
 in
+  if rcd = nil then 1 else 0;
   i := i+i+(2-3)/4*5;
   let var x := r1.first + r1.rest in 2*x end;
   if i > 0 then i := i * i;

@@ -3,13 +3,13 @@ open Core.Std
 module Env : sig
     type access
     type ty = Types.ty
-    type enventry = VarEntry of ty | FunEntry of (ty list * ty)
+    type enventry = VarEntry of ty | FunEntry of ((Symbol.symbol * ty) list * ty)
     val base_tenv : ty Symbol.table
     val base_venv : enventry Symbol.table
 end = struct
     type ty = Types.ty
     type access = unit
-    type enventry = VarEntry of ty | FunEntry of (ty list * ty)
+    type enventry = VarEntry of ty | FunEntry of ((Symbol.symbol * ty) list * ty)
 
     let base_tenv =
       let intsym = Symbol.sym "int"
@@ -35,11 +35,14 @@ transTy: tenv * Absyn.ty -> Types.ty
 *)
 
 
-let assertTyEq found expect pos =
+let checkTyEq found expect pos =
   if (found <> expect) then
     raise (Types.UnexpectedType (found, expect, pos))
 
-let checkInt {exp=_; ty=ty} pos = assertTyEq ty Types.Int pos
+let checkInt {exp=_; ty=ty} pos = checkTyEq ty Types.Int pos
+
+let checkTyEqOrNil found expect pos =
+    if (found <> Types.Nil) then checkTyEq found expect pos
 
 let assertEq v1 v2 = assert (v1 = v2)
 
@@ -56,11 +59,14 @@ let rec get_record_type rcds sym = match rcds with
 
 let transTy tenv ty =
   let mkRecord fields =
-    let mkrec ({fldname; fldtyp; _}: A.field) =
+    let mkrec ({fldname; fldtyp; _}: A.field) = 
+        (*
       let provty = match Symbol.find tenv fldtyp with
         | Some ty -> ty
-        | None -> Types.Name (fldty, None) in
+        | None -> Types.Name (fldtyp, None) in
       (fldname, provty) in
+    *)
+    (fldname, getSym tenv fldtyp) in
     let r = Types.Record (List.map fields mkrec, ref ()) in
     r
   in
@@ -86,7 +92,7 @@ let rec transExp venv tenv =
         | A.SeqExp exprs ->
             List.fold_left exprs ~init: (wrap Types.Unit) ~f: (fun ty (expr, pos) -> trexp expr)
         | A.OpExp(left, op, right, pos) -> begin
-                assertTyEq (unwrap (trexp left)) (unwrap (trexp right)) pos;
+                checkTyEq (unwrap (trexp left)) (unwrap (trexp right)) pos;
                 wrap Types.Int
             end
         | A.AssignExp(var, exp, pos) -> check_assignment var exp pos
@@ -97,19 +103,19 @@ let rec transExp venv tenv =
           let () = checkInt (trexp ifexp) pos in
           let thenty = unwrap (trexp thenexp) in
           let () = match elseexpopt with
-            | Some elseexp -> assertTyEq (unwrap (trexp elseexp)) thenty pos
-            | None -> assertTyEq thenty Types.Unit pos in
+            | Some elseexp -> checkTyEq (unwrap (trexp elseexp)) thenty pos
+            | None -> checkTyEq thenty Types.Unit pos in
           wrap thenty
         | A.WhileExp (whileexp, loopexp, pos) ->
           checkInt (trexp whileexp) pos;
-          assertTyEq (unwrap (trexp loopexp)) Types.Unit pos;
+          checkTyEq (unwrap (trexp loopexp)) Types.Unit pos;
           wrap Types.Unit
         | A.ForExp(sym, _, assignexp, toexp, loopexp, pos) ->
           checkInt (trexp assignexp) pos;
           checkInt (trexp toexp) pos;
-          let (venv', tenv') = transDec (venv, tenv) (A.VarDec
+          let (venv', tenv') = transDecBody (venv, tenv) (A.VarDec
           {vname=sym; vescape=ref false; vtyp=None; init=assignexp; vpos=pos}) in
-          assertTyEq (unwrap (transExp venv' tenv' loopexp)) Types.Unit pos;
+          checkTyEq (unwrap (transExp venv' tenv' loopexp)) Types.Unit pos;
           wrap Types.Unit
         | A.BreakExp (pos) -> wrap Types.Unit
         | A.ArrayExp(sym, ctexp, initexp, pos) ->
@@ -120,15 +126,15 @@ let rec transExp venv tenv =
     and check_record_types wanted found = match (wanted, found) with
         | ((sym1, ty1)::wntd, (sym2, exp, pos)::fnd) -> 
             assertEq (Symbol.name sym1) (Symbol.name sym2);
-            assertTyEq (unwrap (trexp exp)) ty1 pos;
+            checkTyEq (unwrap (trexp exp)) ty1 pos;
             check_record_types wntd fnd
         | ((s,t)::xs, []) -> raise (Types.TypeNotFound (s, Lexing.dummy_pos))
         | ([], (s,_,_)::xs) -> raise (Types.TypeNotFound (s, Lexing.dummy_pos))
         | ([], []) -> ()
 
     and check_func_call argtys exps pos = match (argtys, exps) with
-        | (ty::args, e::exps) ->
-          assertTyEq (unwrap (trexp e)) ty pos;
+        | ((_, ty)::args, e::exps) ->
+          checkTyEq (unwrap (trexp e)) ty pos;
           check_func_call args exps pos
         | (x::xs, []) -> raise (Types.TypeNotFound (Symbol.dummy, Lexing.dummy_pos))
         | ([], x::xs) -> raise (Types.TypeNotFound (Symbol.dummy, Lexing.dummy_pos))
@@ -137,7 +143,7 @@ let rec transExp venv tenv =
     and check_assignment var exp pos =
         let ty1 = unwrap (trvar var)
         and ty2 = unwrap (trexp exp) in
-        assertTyEq ty2 ty1 pos;
+        checkTyEq ty2 ty1 pos;
         wrap Types.Unit
 
     and trvar = function
@@ -152,31 +158,54 @@ let rec transExp venv tenv =
             in checkInt (trexp exp) pos; wrap ty
     in trexp
 
-and transDec (venv, tenv) dec =
-  let funcdec {A.fname; params; result; body; fpos} =
+and transDecHeader (venv, tenv) dec =
+  let funcheader {A.fname; params; result; body; fpos} =
+    (* add the function signature to venv *)
     let resty = match result with
       | Some (name, pos) -> getSym tenv name
       | None -> Types.Unit 
-    and transparam ({A.fldname; fldtyp; _}: A.field) = (fldname, getSym tenv fldtyp)
-    and getTy (_, ty) = ty in
+    and transparam ({A.fldname; fldtyp; _}: A.field) = (fldname, getSym tenv fldtyp) in
     let params' = List.map params transparam in
-    let venv' = Symbol.enter venv fname (Env.FunEntry (List.map params' getTy, resty))
-    and enterparam env (name, ty) = Symbol.enter env name (Env.VarEntry ty) in
-    let venv'' = List.fold_left params' ~init: venv' ~f: enterparam in
-    assertTyEq (unwrap (transExp venv'' tenv body)) resty fpos;
-    (venv', tenv)
+    let funentry = Env.FunEntry (params', resty) in
+    (Symbol.enter venv fname funentry, tenv)
 
   in match dec with
-    | A.FunctionDec fundec -> funcdec fundec
+    | A.FunctionDec fundec -> funcheader fundec
+    | A.TypeDec (sym, A.RecordTy _, pos) ->
+      (* Add dummy record entry *)
+      (venv, Symbol.enter tenv sym (Types.Name (sym, ref None)))
+    | _ -> (venv, tenv)
+
+and transDecBody (venv, tenv) dec =
+  let funcbodyck {A.fname; body; fpos; _} =
+    let Env.FunEntry (params, resty) = getSym venv fname
+    and enterparam env (name, ty) = Symbol.enter env name (Env.VarEntry ty) in
+    let venv'' = List.fold_left params ~init:venv ~f:enterparam in
+    checkTyEq (unwrap (transExp venv'' tenv body)) resty fpos
+
+  in match dec with
+    | A.FunctionDec fundec -> let _ = funcbodyck fundec in (venv, tenv)
     | A.VarDec {vname; vtyp=tyopt; init=exp; _} ->
       let {exp; ty} = transExp venv tenv exp in
       let () = match tyopt with 
-        | Some (sym, pos) -> assertTyEq (getSym tenv sym) ty pos
+        | Some (sym, pos) -> begin
+          let declty = getSym tenv sym in
+          match declty with
+            | Record _ -> checkTyEqOrNil ty declty pos
+            | _ -> checkTyEq ty (getSym tenv sym) pos
+        end
         | None -> () in
       (Symbol.enter venv vname (Env.VarEntry ty), tenv)
-    | A.TypeDec (sym, ty, pos) -> (venv, Symbol.enter tenv sym (transTy tenv ty))
+    | A.TypeDec (sym, ty, pos) ->
+      (venv, Symbol.enter tenv sym (transTy tenv ty))
 
-and transDecs venv tenv decs = List.fold_left decs ~init:(venv, tenv) ~f:transDec
+and transDecFinalise (venv, tenv) dec = (venv, tenv)
+
+and transDecs venv tenv decs =
+    let headersEnv = List.fold_left decs ~init:(venv, tenv) ~f:transDecHeader in
+    let bodysEnv = List.fold_left decs ~init:headersEnv ~f:transDecBody in
+    List.fold_left decs ~init: bodysEnv ~f:transDecFinalise 
+
 
 let typeck ast =
     print_endline "Type-checking AST:";
