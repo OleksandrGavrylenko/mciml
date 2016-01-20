@@ -2,7 +2,7 @@ open Core.Std
 
 type symbol = string * int [@@deriving show]
 let nextsym = ref 0
-let dummy = ("Dummy", -1)
+let dummy = ("DummySym", -1)
 let table = String.Table.create ()
 
 let sym name = match Hashtbl.find table name with

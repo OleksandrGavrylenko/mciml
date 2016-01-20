@@ -4,6 +4,7 @@ let
    function flush() = ()
    function getchar() : string = "meh"
    function ord(s: string) : int = 1
+   function chr(i: int) : string = "meh"
 
   type any = {any : int}
   var buffer := getchar()
@@ -52,7 +53,7 @@ let
     if l = nil then print("\n")
     else (printint(l.first); print(" "); printlist(l.rest) )
 
-  in printlist(merge(readlist()))
+  in printlist(merge(readlist(), readlist()))
 
 end
 
